@@ -1,0 +1,9 @@
+int main ( )
+{
+ //este es un comentario
+ int id1 = 67;
+ int id2 = 45;
+ int id3;
+ string 123abd;
+ id3 = id1 + id2;
+}

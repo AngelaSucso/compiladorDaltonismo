@@ -1,13 +1,13 @@
-int main ( )
-{
- //este es un comentario
- int id1 = 67;
- int id2 = 45;
- int id3;
- string 123abd;
- id3 = id1 + id2;
+// Prueba comentario de linea
+int x = 3.14;
+float precio = 99.99;
 
- if (id1 == id2) {
-    id1++;
- }
-}
+/* Este es un
+comentario de
+bloque */
+
+int y = 42;
+double pi = 3.14159;
+
+/* comentario en una sola linea */
+int z = 5;

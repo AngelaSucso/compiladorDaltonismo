@@ -42,9 +42,15 @@ bool esNumero(string palabra) {
     if (palabra.empty())
         return false;
 
+    bool tienePunto = false;
+
     for (int i = 0; i < palabra.length(); i++) {
-        if (!isdigit(palabra[i]))
+        if (palabra[i] == '.') {
+            if (tienePunto) return false; // dos puntos → error
+            tienePunto = true;
+        } else if (!isdigit(palabra[i])) {
             return false;
+        }
     }
     return true;
 }
@@ -195,7 +201,7 @@ int main() {
     string linea;
     vector<Token> tokens;
     int numeroLinea = 1;
-
+    bool enComentarioBloque = false; 
     ///TOKENIZACIÓN
     while (getline(archivo, linea)) {
         string actual = "";
@@ -203,6 +209,25 @@ int main() {
         
         for (int i = 0; i < linea.length(); i++) {
             char c = linea[i];
+
+            if (enComentarioBloque) {
+                if (c == '*' && i + 1 < linea.length() && linea[i + 1] == '/') {
+                    i++;
+                    enComentarioBloque = false;
+                }
+                continue;
+            }
+
+            if (c == '/' && i + 1 < linea.length() && linea[i + 1] == '*') {
+                enComentarioBloque = true;
+                i++;
+                continue;
+            }
+
+            // Comentario de línea // ← este ya lo tienes en línea 185
+            if (c == '/' && i + 1 < linea.length() && linea[i + 1] == '/') {
+                break;
+            }
 
             // COMENTARIOS //
             if (c == '/' && i + 1 < linea.length() && linea[i + 1] == '/') {
@@ -296,6 +321,9 @@ int main() {
                 continue;
             }
             // OTROS CARACTERES
+            else if (c == '.' && i + 1 < linea.length() && isdigit(linea[i + 1])) {
+                actual += c; // lo acumula como parte del número
+            }
             else {
                 actual = actual + c;
             }

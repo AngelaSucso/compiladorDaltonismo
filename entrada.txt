@@ -6,4 +6,8 @@ int main ( )
  int id3;
  string 123abd;
  id3 = id1 + id2;
+
+ if (id1 == id2) {
+    id1++;
+ }
 }

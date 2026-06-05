@@ -1,13 +1,47 @@
-// Prueba comentario de linea
-int x = 3.14;
-float precio = 99.99;
+// ==========================================
+// PRUEBA DE CONSTRUCCIONES CORRECTAS
+// ==========================================
 
-/* Este es un
-comentario de
-bloque */
+/* Primero probamos las declaraciones 
+   de diferentes tipos de variables */
+int contador = 0;
+float pi = 3.1416;
+string mensaje = "Hola Mundo";
 
-int y = 42;
-double pi = 3.14159;
+/* Una funcion void para verificar
+   estructuras limpias */
+void inicializar() {
+    contador = 1;
+}
 
-/* comentario en una sola linea */
-int z = 5;
+// Probando la estructura condicional IF-ELSE
+if (contador == 0) {
+    int x = 10;
+} else {
+    int x = 20;
+}
+
+// Probando el bucle WHILE con una condicion simple
+while (contador < 10) {
+    contador++;
+}
+
+// Probando el bucle FOR en su forma simplificada
+for (int i = 0; i < 5; i++) {
+    int temporal = i;
+}
+
+// ==========================================
+// PRUEBA DE ERRORES SINTÁCTICOS
+// ==========================================
+
+// Error 1: Falta el punto y coma en una declaracion
+int errorVariable = 5
+
+// Error 2: Mal formada la condicion del IF (falta parentesis de cierre)
+if (contador > 5 {
+    int y = 100;
+}
+
+// Error 3: Token no reconocido en nivel superior (un operador suelto)
+==

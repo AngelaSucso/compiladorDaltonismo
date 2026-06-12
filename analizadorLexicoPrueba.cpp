@@ -7,7 +7,7 @@
 
 using namespace std;
 
-// COLORES
+/*
 const int COLOR_KEYWORD = 9;
 const int COLOR_NUMERO  = 11;
 const int COLOR_STRING  = 10;
@@ -16,6 +16,35 @@ const int COLOR_DELIM   = 13;
 const int COLOR_OP      = 14;
 const int COLOR_ERROR   = 12;
 const int COLOR_COMMENT = 2;
+*/
+
+// COLORES DE CONSOLA
+const int COLOR_NEGRO         = 0;
+const int COLOR_AZUL_OSCURO   = 1;
+const int COLOR_VERDE_OSCURO  = 2;
+const int COLOR_CIAN_OSCURO   = 3;
+const int COLOR_ROJO_OSCURO   = 4;
+const int COLOR_MAGENTA_OSCURO= 5;
+const int COLOR_DORADO        = 6;
+const int COLOR_GRIS_CLARO    = 7;
+const int COLOR_GRIS_OSCURO   = 8;
+const int COLOR_AZUL          = 9;
+const int COLOR_VERDE         = 10;
+const int COLOR_CELESTE       = 11;
+const int COLOR_ROJO          = 12;
+const int COLOR_MAGENTA       = 13;
+const int COLOR_AMARILLO      = 14;
+const int COLOR_BLANCO        = 15;
+
+// COLORES
+const int COLOR_KEYWORD = COLOR_AZUL;
+const int COLOR_NUMERO  = COLOR_CELESTE;
+const int COLOR_STRING  = COLOR_DORADO;
+const int COLOR_IDENT   = COLOR_AMARILLO;
+const int COLOR_OP      = COLOR_VERDE;
+const int COLOR_DELIM   = COLOR_GRIS_CLARO;
+const int COLOR_COMMENT = COLOR_GRIS_OSCURO;
+const int COLOR_ERROR   = COLOR_MAGENTA;
 
 void setColor(int color) {
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
@@ -482,13 +511,21 @@ int main() {
     html << "th, td { border:1px solid gray; padding:8px; }";
     html << "th { background-color:#444; }";
     html << ".keyword { color:#569CD6; font-weight:bold; }";
-    html << ".numero  { color:#4EC9B0; }";
+    /*html << ".numero  { color:#4EC9B0; }";
     html << ".string  { color:#CE9178; }";
     html << ".ident   { color:#DCDCAA; }";
     html << ".op      { color:#FFD700; }";
     html << ".delim   { color:#C586C0; }";
-    html << ".comment { color:#6A9955; font-style:italic; }";
-    html << ".error   { color:#FF5555; font-weight:bold; }";
+    html << ".comment { color:#9E9E9E; font-style:italic; }";
+    html << ".error   { color:#FF00FF; font-weight:bold; text-decoration:underline; }";*/
+    html << ".keyword { color:#569CD6; font-weight:bold; }";      // Azul
+    html << ".numero  { color:#4EC9B0; }";                        // Celeste
+    html << ".string  { color:#FFD700; font-style:italic; }";     // Dorado
+    html << ".ident   { color:#FFFF00; }";                        // Amarillo
+    html << ".op      { color:#4CAF50; }";                        // Verde
+    html << ".delim   { color:#D4D4D4; }";                        // Gris claro
+    html << ".comment { color:#808080; font-style:italic; }";     // Gris oscuro
+    html << ".error   { color:#FF00FF; font-weight:bold; text-decoration:underline; }"; // Magenta
     html << ".syntax-ok    { background:#1e3a1e; padding:10px; border-left:5px solid #4CAF50; margin-bottom:10px; border-radius:5px; }";
     html << ".syntax-error { background:#3a1e1e; padding:10px; border-left:5px solid #FF5555; margin-bottom:10px; border-radius:5px; }";
     html << "</style>";
@@ -508,7 +545,7 @@ int main() {
     html << "<p><span class='comment'>COMMENT</span> &rarr; Comentarios</p>";
     html << "<p><span class='error'>ERROR</span>     &rarr; Error lexico</p>";
 
-    // JUSTIFICACION
+    /*// JUSTIFICACION
     html << "<h2>Justificacion de Colores</h2>";
     html << "<ul>";
     html << "<li><b style='color:#569CD6'>Azul:</b>    keywords importantes.</li>";
@@ -519,6 +556,26 @@ int main() {
     html << "<li><b style='color:#C586C0'>Morado:</b>  delimitadores estructurales.</li>";
     html << "<li><b style='color:#6A9955'>Verde:</b>   comentarios auxiliares.</li>";
     html << "<li><b style='color:#FF5555'>Rojo:</b>    errores visibles inmediatamente.</li>";
+    */
+
+    html << "<h2>Justificacion de Colores</h2>";
+    html << "<ul>";
+    html << "<li><b style='color:#569CD6'>Azul:</b> palabras reservadas. "
+            "Se eligio por su alta diferenciacion visual y porque permite identificar rapidamente las estructuras principales del lenguaje.</li>";
+    html << "<li><b style='color:#4EC9B0'>Celeste:</b> numeros enteros y flotantes. "
+            "Facilita distinguir los valores numericos de otros elementos del codigo fuente.</li>";
+    html << "<li><b style='color:#FFD700'>Dorado:</b> cadenas de texto. "
+            "Presenta un contraste perceptible respecto a las palabras reservadas e identificadores, favoreciendo su reconocimiento.</li>";
+    html << "<li><b style='color:#FFFF00'>Amarillo:</b> identificadores. "
+            "Mantiene buena visibilidad y facilita el seguimiento de variables y funciones durante la lectura del programa.</li>";
+    html << "<li><b style='color:#4CAF50'>Verde:</b> operadores. "
+            "Permite una lectura clara de las expresiones sin generar sobrecarga visual.</li>";
+    html << "<li><b style='color:#D4D4D4'>Gris claro:</b> delimitadores. "
+            "Al ser elementos estructurales de alta frecuencia, se representan con un color neutro para evitar distracciones visuales.</li>";
+    html << "<li><b style='color:#808080'>Gris oscuro:</b> comentarios. "
+            "Al corresponder a informacion auxiliar, se muestran con menor prominencia visual para reducir la carga cognitiva.</li>";
+    html << "<li><b style='color:#FF00FF'>Magenta:</b> errores lexicos. "
+            "Se eligio por su alta visibilidad para usuarios con deuteranopia y se complementa con estilos adicionales para no depender exclusivamente del color.</li>";
     html << "</ul>";
 
     // ==========================

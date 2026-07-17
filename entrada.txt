@@ -1,0 +1,20 @@
+#include <iostream>
+using namespace std;
+int main()
+{
+    int x = 5;
+    int y = 10;
+    int suma = x + y;
+    int resta = x - y; 
+    int multiplicacion = x * y;
+    char operador = '+';
+    cout << "La suma de " << x << " y " << y << " es: " 
+    << suma << endl;
+    cout << "La resta de " << x << " y " << y << " es: " 
+    << resta << endl;
+    cout << "La multiplicación de " << x << " y " << y << " es: " 
+    << multiplicacion << endl;
+    int valor;
+    return 0;
+    
+}

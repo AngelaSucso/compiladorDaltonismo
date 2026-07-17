@@ -1,47 +1,20 @@
-// ==========================================
-// PRUEBA DE CONSTRUCCIONES CORRECTAS
-// ==========================================
-
-/* Primero probamos las declaraciones 
-   de diferentes tipos de variables */
-int contador = 0;
-float pi = 3.1416;
-string mensaje = "Hola Mundo";
-
-/* Una funcion void para verificar
-   estructuras limpias */
-void inicializar() {
-    contador = 1;
+#include <iostream>
+using namespace std;
+int main()
+{
+    int x = 5;
+    int y = 10;
+    int suma = x + y;
+    int resta = x - y; 
+    int multiplicacion = x * y;
+    char operador = '+';
+    cout << "La suma de " << x << " y " << y << " es: " 
+    << suma << endl;
+    cout << "La resta de " << x << " y " << y << " es: " 
+    << resta << endl;
+    cout << "La multiplicación de " << x << " y " << y << " es: " 
+    << multiplicacion << endl;
+    int valor;
+    return 0;
+    
 }
-
-// Probando la estructura condicional IF-ELSE
-if (contador == 0) {
-    int x = 10;
-} else {
-    int x = 20;
-}
-
-// Probando el bucle WHILE con una condicion simple
-while (contador < 10) {
-    contador++;
-}
-
-// Probando el bucle FOR en su forma simplificada
-for (int i = 0; i < 5; i++) {
-    int temporal = i;
-}
-
-// ==========================================
-// PRUEBA DE ERRORES SINTÁCTICOS
-// ==========================================
-
-// Error 1: Falta el punto y coma en una declaracion
-int errorVariable = 5
-
-// Error 2: Mal formada la condicion del IF (falta parentesis de cierre)
-if (contador > 5 {
-    int y = 100;
-}
-
-// Error 3: Token no reconocido en nivel superior (un operador suelto)
-==

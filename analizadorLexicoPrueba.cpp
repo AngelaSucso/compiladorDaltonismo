@@ -4,9 +4,9 @@
 #include <vector>
 #include <cctype>
 #include <windows.h>
-
+ 
 using namespace std;
-
+ 
 /*
 const int COLOR_KEYWORD = 9;
 const int COLOR_NUMERO  = 11;
@@ -17,7 +17,7 @@ const int COLOR_OP      = 14;
 const int COLOR_ERROR   = 12;
 const int COLOR_COMMENT = 2;
 */
-
+ 
 // COLORES DE CONSOLA
 const int COLOR_NEGRO         = 0;
 const int COLOR_AZUL_OSCURO   = 1;
@@ -35,7 +35,7 @@ const int COLOR_ROJO          = 12;
 const int COLOR_MAGENTA       = 13;
 const int COLOR_AMARILLO      = 14;
 const int COLOR_BLANCO        = 15;
-
+ 
 // COLORES
 const int COLOR_KEYWORD = COLOR_AZUL;
 const int COLOR_NUMERO  = COLOR_CELESTE;
@@ -45,15 +45,15 @@ const int COLOR_OP      = COLOR_VERDE;
 const int COLOR_DELIM   = COLOR_GRIS_CLARO;
 const int COLOR_COMMENT = COLOR_GRIS_OSCURO;
 const int COLOR_ERROR   = COLOR_MAGENTA;
-
+ 
 void setColor(int color) {
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
 }
-
+ 
 // ==========================
 // CLASIFICACION
 // ==========================
-
+ 
 bool esKeyword(string palabra) {
     return (
         palabra == "int"    ||
@@ -70,7 +70,7 @@ bool esKeyword(string palabra) {
         palabra == "void"
     );
 }
-
+ 
 bool esNumero(string palabra) {
     if (palabra.empty()) return false;
     int digitos = 0;
@@ -87,7 +87,7 @@ bool esNumero(string palabra) {
     }
     return digitos > 0;
 }
-
+ 
 bool esIdentificador(string palabra) {
     if (palabra.empty()) return false;
     if (!isalpha(palabra[0]) && palabra[0] != '_')
@@ -98,7 +98,7 @@ bool esIdentificador(string palabra) {
     }
     return true;
 }
-
+ 
 bool esString(string palabra) {
     return (
         palabra.length() >= 2 &&
@@ -106,13 +106,13 @@ bool esString(string palabra) {
         palabra[palabra.length() - 1] == '"'
     );
 }
-
+ 
 string obtenerTipo(string lexema) {
     if (esKeyword(lexema))       return "KEYWORD";
     if (esNumero(lexema))        return "NUMERO";
     if (esString(lexema))        return "STRING";
     if (esIdentificador(lexema)) return "IDENT";
-
+ 
     if (
         lexema == "+"  || lexema == "-"  ||
         lexema == "*"  || lexema == "/"  ||
@@ -122,7 +122,7 @@ string obtenerTipo(string lexema) {
         lexema == ">=" || lexema == "++" ||
         lexema == "--"
     ) return "OP";
-
+ 
     if (
         lexema == ";" ||
         lexema == "(" ||
@@ -130,45 +130,45 @@ string obtenerTipo(string lexema) {
         lexema == "{" ||
         lexema == "}"
     ) return "DELIM";
-
+ 
     return "ERROR";
 }
-
+ 
 // ==========================
 // TOKEN
 // ==========================
-
+ 
 struct Token {
     string lexema;
     string tipo;
     int    linea;
     int    columna;
 };
-
+ 
 // ==========================
 // ANALISIS SINTACTICO
 // ==========================
-
+ 
 int indice = 0;
 vector<string> erroresSintacticos;
 vector<string> declaracionesCorrectas;
-
+ 
 Token actualToken(vector<Token>& tokens) {
     if (indice < (int)tokens.size())
         return tokens[indice];
     return {"", "EOF", -1, -1};
 }
-
+ 
 void avanzar() {
     indice++;
 }
-
+ 
 // Saltear comentarios
 void saltarComentarios(vector<Token>& tokens) {
     while (indice < (int)tokens.size() && actualToken(tokens).tipo == "COMMENT")
         avanzar();
 }
-
+ 
 bool consumir(vector<Token>& tokens, string esperado) {
     saltarComentarios(tokens);
     Token t = actualToken(tokens);
@@ -185,13 +185,13 @@ bool consumir(vector<Token>& tokens, string esperado) {
     cout << "Linea: "       << t.linea  << endl;
     cout << "Columna: "     << t.columna << endl;
     setColor(7);
-
+ 
     string err = "Se esperaba <b>" + esperado + "</b>, se encontro <b>" + t.lexema + "</b> (linea " + to_string(t.linea) + ")";
     erroresSintacticos.push_back(err);
     avanzar();
     return false;
 }
-
+ 
 bool consumirTipo(vector<Token>& tokens, string tipo, string desc) {
     saltarComentarios(tokens);
     Token t = actualToken(tokens);
@@ -208,13 +208,13 @@ bool consumirTipo(vector<Token>& tokens, string tipo, string desc) {
     cout << "Linea: "       << t.linea  << endl;
     cout << "Columna: "     << t.columna << endl;
     setColor(7);
-
+ 
     string err = "Se esperaba " + desc + ", se encontro <b>" + t.lexema + "</b> (linea " + to_string(t.linea) + ")";
     erroresSintacticos.push_back(err);
     avanzar();
     return false;
 }
-
+ 
 // ─────────────────────────────────────────
 // CONDICION:  IDENT/NUM  OP  IDENT/NUM
 //             o simplemente IDENT/NUM
@@ -222,7 +222,7 @@ bool consumirTipo(vector<Token>& tokens, string tipo, string desc) {
 bool condicion(vector<Token>& tokens) {
     saltarComentarios(tokens);
     Token t = actualToken(tokens);
-
+ 
     // lado izquierdo
     if (t.tipo == "IDENT" || t.tipo == "NUMERO") {
         avanzar();
@@ -235,7 +235,7 @@ bool condicion(vector<Token>& tokens) {
         avanzar();
         return false;
     }
-
+ 
     // operador relacional (opcional, pero si existe lo consumimos)
     saltarComentarios(tokens);
     t = actualToken(tokens);
@@ -259,12 +259,12 @@ bool condicion(vector<Token>& tokens) {
     }
     return true;
 }
-
+ 
 // ─────────────────────────────────────────
 // CUERPO:  { sentencias* }
 // ─────────────────────────────────────────
 bool sentencia(vector<Token>& tokens);   // forward
-
+ 
 bool cuerpo(vector<Token>& tokens) {
     if (!consumir(tokens, "{")) return false;
     saltarComentarios(tokens);
@@ -287,13 +287,13 @@ bool cuerpo(vector<Token>& tokens) {
     }
     return consumir(tokens, "}");
 }
-
+ 
 // ─────────────────────────────────────────
 // DECLARACION:  TIPO IDENT [= VALOR] ;
 // ─────────────────────────────────────────
 bool declaracion(vector<Token>& tokens) {
     Token t = actualToken(tokens);
-
+ 
     if (t.lexema == "int" || t.lexema == "float" || t.lexema == "string") {
         avanzar();
     } else {
@@ -305,7 +305,7 @@ bool declaracion(vector<Token>& tokens) {
         avanzar();
         return false;
     }
-
+ 
     t = actualToken(tokens);
     if (t.tipo == "IDENT") {
         avanzar();
@@ -315,7 +315,7 @@ bool declaracion(vector<Token>& tokens) {
         avanzar();
         return false;
     }
-
+ 
     t = actualToken(tokens);
     if (t.lexema == "=") {
         avanzar();
@@ -329,7 +329,7 @@ bool declaracion(vector<Token>& tokens) {
             return false;
         }
     }
-
+ 
     t = actualToken(tokens);
     if (t.lexema == ";") {
         avanzar();
@@ -341,7 +341,7 @@ bool declaracion(vector<Token>& tokens) {
         return false;
     }
 }
-
+ 
 // ─────────────────────────────────────────
 // IF:  if ( condicion ) cuerpo [else cuerpo]
 // ─────────────────────────────────────────
@@ -351,7 +351,7 @@ bool sentenciaIf(vector<Token>& tokens) {
     if (!condicion(tokens))       return false;
     if (!consumir(tokens, ")"))   return false;
     if (!cuerpo(tokens))          return false;
-
+ 
     saltarComentarios(tokens);
     Token t = actualToken(tokens);
     if (t.lexema == "else") {
@@ -360,7 +360,7 @@ bool sentenciaIf(vector<Token>& tokens) {
     }
     return true;
 }
-
+ 
 // ─────────────────────────────────────────
 // WHILE:  while ( condicion ) cuerpo
 // ─────────────────────────────────────────
@@ -372,7 +372,7 @@ bool sentenciaWhile(vector<Token>& tokens) {
     if (!cuerpo(tokens))         return false;
     return true;
 }
-
+ 
 // ─────────────────────────────────────────
 // FOR:  for ( TIPO IDENT = VAL ; condicion ; IDENT OP ) cuerpo
 //       Forma simplificada: for ( init ; cond ; inc ) cuerpo
@@ -384,11 +384,11 @@ bool sentenciaWhile(vector<Token>& tokens) {
 bool sentenciaFor(vector<Token>& tokens) {
     avanzar(); // consumir 'for'
     if (!consumir(tokens, "(")) return false;
-
+ 
     // ── init ──
     saltarComentarios(tokens);
     Token t = actualToken(tokens);
-
+ 
     if (t.lexema == "int" || t.lexema == "float" || t.lexema == "string") {
         // declaracion de variable (sin punto y coma final, lo consumimos nosotros)
         avanzar(); // tipo
@@ -420,13 +420,13 @@ bool sentenciaFor(vector<Token>& tokens) {
             }
         }
     }
-
+ 
     if (!consumir(tokens, ";")) return false;
-
+ 
     // ── condicion ──
     if (!condicion(tokens))      return false;
     if (!consumir(tokens, ";"))  return false;
-
+ 
     // ── incremento: IDENT (OP | = EXPR) ──
     saltarComentarios(tokens);
     t = actualToken(tokens);
@@ -443,12 +443,12 @@ bool sentenciaFor(vector<Token>& tokens) {
             if (t.tipo == "IDENT" || t.tipo == "NUMERO") avanzar();
         }
     }
-
+ 
     if (!consumir(tokens, ")")) return false;
     if (!cuerpo(tokens))        return false;
     return true;
 }
-
+ 
 // ─────────────────────────────────────────
 // VOID:  void IDENT ( ) cuerpo
 // ─────────────────────────────────────────
@@ -460,24 +460,24 @@ bool sentenciaVoid(vector<Token>& tokens) {
     if (!cuerpo(tokens))         return false;
     return true;
 }
-
+ 
 // ─────────────────────────────────────────
 // SENTENCIA (dispatcher)
 // ─────────────────────────────────────────
 bool sentencia(vector<Token>& tokens) {
     saltarComentarios(tokens);
     Token t = actualToken(tokens);
-
+ 
     if (t.lexema == "if")    return sentenciaIf(tokens);
     if (t.lexema == "while") return sentenciaWhile(tokens);
     if (t.lexema == "for")   return sentenciaFor(tokens);
     if (t.lexema == "void")  return sentenciaVoid(tokens);
-
+ 
     if (t.lexema == "int"    ||
         t.lexema == "float"  ||
         t.lexema == "string")
         return declaracion(tokens);
-
+ 
     // sentencia de expresion / return / etc.  → consumir hasta ';'
     while (indice < (int)tokens.size() &&
            actualToken(tokens).lexema != ";" &&
@@ -487,21 +487,48 @@ bool sentencia(vector<Token>& tokens) {
     if (actualToken(tokens).lexema == ";") avanzar();
     return true;
 }
-
+ 
 // ==========================
 // MAIN
 // ==========================
+ 
+int main(int argc, char* argv[]) {
 
-int main() {
+    // ==========================
+    // ARGUMENTOS DE LINEA DE COMANDOS
+    // La extension de VS Code llama:
+    //   analizadorLexicoPrueba.exe entrada.txt salida.html --no-open
+    // Se aceptan las rutas de entrada/salida como argumentos, y el flag
+    // --no-open evita que el programa abra el navegador (para que la
+    // extension solo actualice el panel interno de VS Code).
+    // ==========================
 
-    ofstream html("salida.html");
+    string rutaEntradaArg = "entrada.txt";
+    string rutaSalidaArg  = "salida.html";
+    bool   noAbrir        = false;
+    int    posicional     = 0;
 
+    for (int i = 1; i < argc; i++) {
+        string arg = argv[i];
+        if (arg == "--no-open") {
+            noAbrir = true;
+        } else if (posicional == 0) {
+            rutaEntradaArg = arg;
+            posicional++;
+        } else if (posicional == 1) {
+            rutaSalidaArg = arg;
+            posicional++;
+        }
+    }
+ 
+    ofstream html(rutaSalidaArg);
+ 
     html << "<!DOCTYPE html>";
     html << "<html>";
     html << "<head>";
     html << "<meta charset='UTF-8'>";
     html << "<title>Compilador Inclusivo</title>";
-
+ 
     // CSS
     html << "<style>";
     html << "body { font-family:Arial; background-color:#1e1e1e; color:white; padding:20px; }";
@@ -526,14 +553,40 @@ int main() {
     html << ".delim   { color:#D4D4D4; }";                        // Gris claro
     html << ".comment { color:#808080; font-style:italic; }";     // Gris oscuro
     html << ".error   { color:#FF00FF; font-weight:bold; text-decoration:underline; }"; // Magenta
-    html << ".syntax-ok    { background:#1e3a1e; padding:10px; border-left:5px solid #4CAF50; margin-bottom:10px; border-radius:5px; }";
-    html << ".syntax-error { background:#3a1e1e; padding:10px; border-left:5px solid #FF5555; margin-bottom:10px; border-radius:5px; }";
+    html << ".syntax-ok { background:#003b46; padding:10px; border-left:5px solid cyan; margin-bottom:10px; border-radius:5px; }";
+    html << ".syntax-error { background:#3b003b; padding:10px; border-left:5px solid magenta; margin-bottom:10px; border-radius:5px; }";
+ 
+    // ── NAVEGACION POR PESTAÑAS ──
+    html << "h1 { margin-bottom:10px; }";
+    html << ".tabs { display:flex; gap:8px; border-bottom:2px solid #444; margin-bottom:20px; flex-wrap:wrap; }";
+    html << ".tab-btn { background:#2b2b2b; color:#eee; border:none; padding:10px 18px; font-size:15px; cursor:pointer; border-radius:8px 8px 0 0; transition:background 0.2s; }";
+    html << ".tab-btn:hover { background:#3a3a3a; }";
+    html << ".tab-btn:focus-visible { outline:3px solid cyan; outline-offset:2px; }";
+    html << ".tab-btn.active { background:#444; border-bottom:3px solid cyan; font-weight:bold; }";
+    html << ".tab-content { display:none; }";
+    html << ".tab-content.active { display:block; }";
+ 
     html << "</style>";
     html << "</head>";
     html << "<body>";
-
+ 
     html << "<h1>Compilador Inclusivo</h1>";
-
+ 
+    // ── BOTONES DE NAVEGACION ──
+    html << "<div class='tabs' role='tablist' aria-label='Secciones del compilador'>";
+    html << "<button class='tab-btn active' id='btn-codigo' role='tab' aria-selected='true' aria-controls='codigo' onclick=\"abrirTab('codigo')\">Codigo</button>";
+    html << "<button class='tab-btn' id='btn-tabla' role='tab' aria-selected='false' aria-controls='tabla' onclick=\"abrirTab('tabla')\">Tabla de Tokens</button>";
+    html << "<button class='tab-btn' id='btn-sintactico' role='tab' aria-selected='false' aria-controls='sintactico' onclick=\"abrirTab('sintactico')\">Analisis Sintactico</button>";
+    html << "<button class='tab-btn' id='btn-accesibilidad' role='tab' aria-selected='false' aria-controls='accesibilidad' onclick=\"abrirTab('accesibilidad')\">Accesibilidad</button>";
+    html << "</div>";
+ 
+    // ==========================
+    // PESTAÑA: ACCESIBILIDAD
+    // (Leyenda de tokens + justificacion de colores)
+    // ==========================
+ 
+    html << "<div class='tab-content' id='accesibilidad' role='tabpanel' aria-labelledby='btn-accesibilidad'>";
+ 
     // LEYENDA
     html << "<h2>Leyenda de Tokens</h2>";
     html << "<p><span class='keyword'>KEYWORD</span> &rarr; Palabras reservadas</p>";
@@ -544,7 +597,7 @@ int main() {
     html << "<p><span class='delim'>DELIM</span>     &rarr; Delimitadores</p>";
     html << "<p><span class='comment'>COMMENT</span> &rarr; Comentarios</p>";
     html << "<p><span class='error'>ERROR</span>     &rarr; Error lexico</p>";
-
+ 
     /*// JUSTIFICACION
     html << "<h2>Justificacion de Colores</h2>";
     html << "<ul>";
@@ -557,7 +610,7 @@ int main() {
     html << "<li><b style='color:#6A9955'>Verde:</b>   comentarios auxiliares.</li>";
     html << "<li><b style='color:#FF5555'>Rojo:</b>    errores visibles inmediatamente.</li>";
     */
-
+ 
     html << "<h2>Justificacion de Colores</h2>";
     html << "<ul>";
     html << "<li><b style='color:#569CD6'>Azul:</b> palabras reservadas. "
@@ -577,39 +630,44 @@ int main() {
     html << "<li><b style='color:#FF00FF'>Magenta:</b> errores lexicos. "
             "Se eligio por su alta visibilidad para usuarios con deuteranopia y se complementa con estilos adicionales para no depender exclusivamente del color.</li>";
     html << "</ul>";
-
+ 
+    html << "</div>"; // fin tab-content accesibilidad
+ 
     // ==========================
     // APERTURA DE ARCHIVO
     // ==========================
-
-    ifstream archivo("entrada.txt");
-
+ 
+    ifstream archivo(rutaEntradaArg);
+ 
     if (!archivo) {
-        cout << "Error al abrir entrada.txt" << endl;
+        cout << "Error al abrir " << rutaEntradaArg << endl;
         return 1;
     }
-
+ 
     vector<Token> tokens;
-
+ 
     string linea;
     int    numeroLinea        = 1;
     bool   enComentarioBloque = false;
-
+ 
     // ==========================
-    // PANEL IZQUIERDO
+    // PESTAÑA: CODIGO
     // ==========================
-
+ 
+    html << "<div class='tab-content active' id='codigo' role='tabpanel' aria-labelledby='btn-codigo'>";
+ 
+    // ── PANEL IZQUIERDO ──
     html << "<div class='contenedor'>";
     html << "<div class='panel'>";
     html << "<h2>Codigo Original</h2>";
     html << "<pre style='tab-size:4;'>";
-
+ 
     vector<string> todasLineas;
     while (getline(archivo, linea)) {
         todasLineas.push_back(linea);
     }
     archivo.close();
-
+ 
     for (const string& l : todasLineas) {
         for (char ch : l) {
             if      (ch == ' ')  html << "&nbsp;";
@@ -618,24 +676,24 @@ int main() {
         }
         html << "<br>";
     }
-
+ 
     html << "</pre>";
     html << "</div>";
-
+ 
     // ==========================
     // ANALISIS LEXICO
     // ==========================
-
+ 
     numeroLinea = 1;
-
+ 
     for (const string& linea : todasLineas) {
-
+ 
         string actual = "";
-
+ 
         for (int i = 0; i < (int)linea.length(); i++) {
-
+ 
             char c = linea[i];
-
+ 
             // ── DENTRO DE COMENTARIO BLOQUE ──
             if (enComentarioBloque) {
                 if (c == '*' && i + 1 < (int)linea.length() && linea[i + 1] == '/') {
@@ -644,7 +702,7 @@ int main() {
                 }
                 continue;
             }
-
+ 
             // ── INICIO COMENTARIO BLOQUE /* ──
             if (c == '/' && i + 1 < (int)linea.length() && linea[i + 1] == '*') {
                 if (actual != "") {
@@ -677,7 +735,7 @@ int main() {
                 tokens.push_back(nuevo);
                 continue;
             }
-
+ 
             // ── COMENTARIO DE LINEA // ──
             if (c == '/' && i + 1 < (int)linea.length() && linea[i + 1] == '/') {
                 string comentario = linea.substr(i);
@@ -689,7 +747,7 @@ int main() {
                 tokens.push_back(nuevo);
                 break;
             }
-
+ 
             // ── ESPACIOS / TABULACIONES ──
             if (c == ' ' || c == '\t') {
                 if (actual != "") {
@@ -703,7 +761,7 @@ int main() {
                 }
                 continue;
             }
-
+ 
             // ── CADENAS DE TEXTO " " ──
             if (c == '"') {
                 if (actual != "") {
@@ -730,7 +788,7 @@ int main() {
                 tokens.push_back(nuevo);
                 continue;
             }
-
+ 
             // ── OPERADORES Y DELIMITADORES ──
             if (
                 c=='+' || c=='-' || c=='*' || c=='/' ||
@@ -771,11 +829,11 @@ int main() {
                 tokens.push_back(nuevo);
                 continue;
             }
-
+ 
             // ── CUALQUIER OTRO CARACTER ──
             actual += c;
         }
-
+ 
         if (actual != "") {
             Token nuevo;
             nuevo.lexema  = actual;
@@ -785,30 +843,28 @@ int main() {
             tokens.push_back(nuevo);
             actual = "";
         }
-
+ 
         numeroLinea++;
     }
-
-    // ==========================
-    // PANEL DERECHO: CODIGO RESALTADO
-    // ==========================
-
+ 
+    // ── PANEL DERECHO: CODIGO RESALTADO ──
+ 
     html << "<div class='panel'>";
     html << "<h2>Codigo Resaltado</h2>";
     html << "<pre style='tab-size:4;'>";
-
+ 
     int lineaActual = 1;
-
+ 
     for (int i = 0; i < (int)tokens.size(); i++) {
-
+ 
         Token t = tokens[i];
-
+ 
         while (lineaActual < t.linea) {
             cout << "\n";
             html << "<br>";
             lineaActual++;
         }
-
+ 
         string mostrar = t.lexema;
         string salida  = "";
         for (char ch : mostrar) {
@@ -816,10 +872,10 @@ int main() {
             else if (ch == '>') salida += "&gt;";
             else                salida += ch;
         }
-
+ 
         string clase = "error";
         int    color = COLOR_ERROR;
-
+ 
         if      (t.tipo == "KEYWORD")  { clase = "keyword"; color = COLOR_KEYWORD; }
         else if (t.tipo == "NUMERO")   { clase = "numero";  color = COLOR_NUMERO;  }
         else if (t.tipo == "STRING")   { clase = "string";  color = COLOR_STRING;  }
@@ -827,27 +883,28 @@ int main() {
         else if (t.tipo == "OP")       { clase = "op";      color = COLOR_OP;      }
         else if (t.tipo == "DELIM")    { clase = "delim";   color = COLOR_DELIM;   }
         else if (t.tipo == "COMMENT")  { clase = "comment"; color = COLOR_COMMENT; }
-
+ 
         setColor(color);
         cout << t.lexema << " ";
         setColor(7);
-
+ 
         html << "<span class='" << clase << "'>" << salida << "</span> ";
     }
-
+ 
     html << "</pre>";
-    html << "</div>";
-    html << "</div>";
-
+    html << "</div>";  // fin panel derecho
+    html << "</div>";  // fin contenedor
+    html << "</div>";  // fin tab-content codigo
+ 
     // ==========================
-    // TABLA DE TOKENS
+    // PESTAÑA: TABLA DE TOKENS
     // ==========================
-
-    html << "<hr>";
+ 
+    html << "<div class='tab-content' id='tabla' role='tabpanel' aria-labelledby='btn-tabla'>";
     html << "<h2>Tabla de Tokens</h2>";
     html << "<table>";
     html << "<tr><th>Lexema</th><th>Tipo</th><th>Linea</th><th>Columna</th></tr>";
-
+ 
     for (int i = 0; i < (int)tokens.size(); i++) {
         Token t = tokens[i];
         html << "<tr>";
@@ -857,33 +914,34 @@ int main() {
         html << "<td>" << t.columna << "</td>";
         html << "</tr>";
     }
-
+ 
     html << "</table>";
-
+    html << "</div>"; // fin tab-content tabla
+ 
     // ==========================
-    // ANALISIS SINTACTICO
+    // PESTAÑA: ANALISIS SINTACTICO
     // ==========================
-
+ 
     cout << "\n\n=====================================\n";
     cout << "       ANALISIS SINTACTICO";
     cout << "\n=====================================\n\n";
-
-    html << "<hr>";
+ 
+    html << "<div class='tab-content' id='sintactico' role='tabpanel' aria-labelledby='btn-sintactico'>";
     html << "<h2>Analisis Sintactico</h2>";
-
+ 
     indice = 0;
-
+ 
     while (indice < (int)tokens.size()) {
-
+ 
         saltarComentarios(tokens);
         if (indice >= (int)tokens.size()) break;
-
+ 
         int    inicio = indice;
         Token  t      = actualToken(tokens);
-
+ 
         // Reglas reconocidas en nivel superior
         bool ok = false;
-
+ 
         if (t.lexema == "if")    { ok = sentenciaIf(tokens);    }
         else if (t.lexema == "while") { ok = sentenciaWhile(tokens); }
         else if (t.lexema == "for")   { ok = sentenciaFor(tokens);   }
@@ -901,23 +959,27 @@ int main() {
             avanzar();
             continue;
         }
-
+ 
         // Armar texto de la construccion
         string texto = "";
         for (int i = inicio; i < indice; i++) {
             texto += tokens[i].lexema + " ";
         }
-
+ 
         if (ok) {
-            setColor(10);
+            setColor(11);
             cout << "Construccion correcta: " << texto << endl;
             setColor(7);
-
+ 
             html << "<div class='syntax-ok'>";
             html << "&#10004; <b>Construccion correcta</b><br><br>";
             html << "<code>" << texto << "</code>";
             html << "</div>";
         } else {
+            // MAGENTA
+            setColor(13);
+            cout << "Error Sintactico: " << texto << endl;
+            setColor(7);
             html << "<div class='syntax-error'>";
             html << "&#10006; <b>Error Sintactico</b><br><br>";
             if (!erroresSintacticos.empty()) {
@@ -926,11 +988,34 @@ int main() {
             html << "</div>";
         }
     }
-
+ 
+    html << "</div>"; // fin tab-content sintactico
+ 
+    // ── SCRIPT DE NAVEGACION POR PESTAÑAS ──
+    html << "<script>";
+    html << "function abrirTab(nombre) {";
+    html << "  var contenidos = document.getElementsByClassName('tab-content');";
+    html << "  for (var i = 0; i < contenidos.length; i++) contenidos[i].classList.remove('active');";
+    html << "  var botones = document.getElementsByClassName('tab-btn');";
+    html << "  for (var i = 0; i < botones.length; i++) { botones[i].classList.remove('active'); botones[i].setAttribute('aria-selected','false'); }";
+    html << "  document.getElementById(nombre).classList.add('active');";
+    html << "  var btn = document.getElementById('btn-' + nombre);";
+    html << "  btn.classList.add('active');";
+    html << "  btn.setAttribute('aria-selected','true');";
+    html << "}";
+    html << "</script>";
+ 
     html << "</body></html>";
     html.close();
-
-    system("start salida.html");
-
+ 
+    // Solo abrimos el navegador si NO vino el flag --no-open.
+    // La extension de VS Code manda --no-open y lee salida.html
+    // directamente para actualizar su panel interno, asi que aqui
+    // ya no hace falta (ni conviene) lanzar el navegador.
+    if (!noAbrir) {
+        string comando = "start " + rutaSalidaArg;
+        system(comando.c_str());
+    }
+ 
     return 0;
 }

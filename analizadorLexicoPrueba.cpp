@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <cctype>
@@ -49,7 +50,18 @@ const int COLOR_ERROR   = COLOR_MAGENTA;
 void setColor(int color) {
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
 }
- 
+
+string escaparHtml(const string& texto) {
+    string salida;
+    for (char c : texto) {
+        if      (c == '<') salida += "&lt;";
+        else if (c == '>') salida += "&gt;";
+        else if (c == '&') salida += "&amp;";
+        else if (c == '"') salida += "&quot;";
+        else                salida += c;
+    }
+    return salida;
+}
 // ==========================
 // CLASIFICACION
 // ==========================
@@ -165,7 +177,8 @@ void avanzar() {
  
 // Saltear comentarios
 void saltarComentarios(vector<Token>& tokens) {
-    while (indice < (int)tokens.size() && actualToken(tokens).tipo == "COMMENT")
+    while (indice < (int)tokens.size() &&
+           (actualToken(tokens).tipo == "COMMENT" || actualToken(tokens).tipo == "PREPROC"))
         avanzar();
 }
  
@@ -289,15 +302,49 @@ bool cuerpo(vector<Token>& tokens) {
 }
  
 // ─────────────────────────────────────────
+// EXPRESION:  VALOR ((+|-|*|/) VALOR)*
+// ─────────────────────────────────────────
+bool expresion(vector<Token>& tokens) {
+    saltarComentarios(tokens);
+    Token t = actualToken(tokens);
+    if (t.tipo == "NUMERO" || t.tipo == "STRING" || t.tipo == "IDENT") {
+        avanzar();
+    } else {
+        string err = "Se esperaba VALOR, se encontro <b>" + t.lexema + "</b> (linea " + to_string(t.linea) + ")";
+        erroresSintacticos.push_back(err);
+        avanzar();
+        return false;
+    }
+    while (true) {
+        saltarComentarios(tokens);
+        t = actualToken(tokens);
+        if (t.tipo == "OP" && (t.lexema=="+" || t.lexema=="-" || t.lexema=="*" || t.lexema=="/")) {
+            avanzar();
+            saltarComentarios(tokens);
+            t = actualToken(tokens);
+            if (t.tipo == "NUMERO" || t.tipo == "STRING" || t.tipo == "IDENT") {
+                avanzar();
+            } else {
+                string err = "Se esperaba VALOR tras operador, se encontro <b>" + t.lexema + "</b> (linea " + to_string(t.linea) + ")";
+                erroresSintacticos.push_back(err);
+                avanzar();
+                return false;
+            }
+        } else break;
+    }
+    return true;
+}
+ 
+// ─────────────────────────────────────────
 // DECLARACION:  TIPO IDENT [= VALOR] ;
 // ─────────────────────────────────────────
 bool declaracion(vector<Token>& tokens) {
     Token t = actualToken(tokens);
  
-    if (t.lexema == "int" || t.lexema == "float" || t.lexema == "string") {
+    if (t.lexema == "int" || t.lexema == "float" || t.lexema == "string" || t.lexema == "char" || t.lexema == "bool") {
         avanzar();
     } else {
-        string err = "Se esperaba TIPO (int/float/string), se encontro <b>" + t.lexema + "</b> (linea " + to_string(t.linea) + ")";
+        string err = "Se esperaba TIPO (int/float/string/char/bool), se encontro <b>" + t.lexema + "</b> (linea " + to_string(t.linea) + ")";
         erroresSintacticos.push_back(err);
         setColor(COLOR_ERROR);
         cout << "\nERROR SINTACTICO: se esperaba TIPO, se encontro: " << t.lexema << endl;
@@ -319,15 +366,7 @@ bool declaracion(vector<Token>& tokens) {
     t = actualToken(tokens);
     if (t.lexema == "=") {
         avanzar();
-        t = actualToken(tokens);
-        if (t.tipo == "NUMERO" || t.tipo == "STRING" || t.tipo == "IDENT") {
-            avanzar();
-        } else {
-            string err = "Se esperaba VALOR, se encontro <b>" + t.lexema + "</b> (linea " + to_string(t.linea) + ")";
-            erroresSintacticos.push_back(err);
-            avanzar();
-            return false;
-        }
+        if (!expresion(tokens)) return false;
     }
  
     t = actualToken(tokens);
@@ -340,6 +379,63 @@ bool declaracion(vector<Token>& tokens) {
         avanzar();
         return false;
     }
+}
+ 
+// ─────────────────────────────────────────
+// FUNCION CON TIPO DE RETORNO:  TIPO IDENT ( ) cuerpo
+// ─────────────────────────────────────────
+bool sentenciaFuncion(vector<Token>& tokens) {
+    avanzar(); // TIPO
+    if (!consumirTipo(tokens, "IDENT", "NOMBRE DE FUNCION")) return false;
+    if (!consumir(tokens, "(")) return false;
+    if (!consumir(tokens, ")")) return false;   // sin parametros por ahora
+    if (!cuerpo(tokens))        return false;
+    return true;
+}
+ 
+// Decide si "TIPO IDENT (" es una funcion o una declaracion normal
+bool declaracionOFuncion(vector<Token>& tokens) {
+    int checkpoint = indice;
+    avanzar(); // TIPO
+    Token siguiente = actualToken(tokens);
+    Token trasIdent = {"", "", -1, -1};
+    if (siguiente.tipo == "IDENT" && indice + 1 < (int)tokens.size())
+        trasIdent = tokens[indice + 1];
+    indice = checkpoint; // restaurar
+ 
+    if (siguiente.tipo == "IDENT" && trasIdent.lexema == "(")
+        return sentenciaFuncion(tokens);
+    return declaracion(tokens);
+}
+ 
+// ─────────────────────────────────────────
+// ENCABEZADO DE FUNCION (solo firma, sin tragarse el cuerpo):
+//   TIPO/void IDENT ( ) {
+// Se usa en el nivel superior del analisis sintactico para poder
+// seguir mostrando cada sentencia del cuerpo por separado, en vez
+// de mostrar toda la funcion como un unico bloque.
+// ─────────────────────────────────────────
+bool encabezadoFuncion(vector<Token>& tokens) {
+    avanzar(); // TIPO o 'void'
+    if (!consumirTipo(tokens, "IDENT", "NOMBRE DE FUNCION")) return false;
+    if (!consumir(tokens, "("))  return false;
+    if (!consumir(tokens, ")"))  return false;  // sin parametros por ahora
+    if (!consumir(tokens, "{"))  return false;
+    return true;
+}
+ 
+// Mira hacia adelante (sin consumir) si el token actual inicia una
+// funcion: TIPO/void IDENT (
+bool esInicioFuncion(vector<Token>& tokens) {
+    Token t = actualToken(tokens);
+    if (t.lexema != "void" && t.lexema != "int" && t.lexema != "float" &&
+        t.lexema != "string" && t.lexema != "char" && t.lexema != "bool")
+        return false;
+ 
+    if (indice + 2 >= (int)tokens.size()) return false;
+    Token ident  = tokens[indice + 1];
+    Token parent = tokens[indice + 2];
+    return (ident.tipo == "IDENT" && parent.lexema == "(");
 }
  
 // ─────────────────────────────────────────
@@ -389,7 +485,7 @@ bool sentenciaFor(vector<Token>& tokens) {
     saltarComentarios(tokens);
     Token t = actualToken(tokens);
  
-    if (t.lexema == "int" || t.lexema == "float" || t.lexema == "string") {
+    if (t.lexema == "int" || t.lexema == "float" || t.lexema == "string" || t.lexema == "char" || t.lexema == "bool") {
         // declaracion de variable (sin punto y coma final, lo consumimos nosotros)
         avanzar(); // tipo
         if (!consumirTipo(tokens, "IDENT", "IDENTIFICADOR")) return false;
@@ -475,8 +571,10 @@ bool sentencia(vector<Token>& tokens) {
  
     if (t.lexema == "int"    ||
         t.lexema == "float"  ||
-        t.lexema == "string")
-        return declaracion(tokens);
+        t.lexema == "string" ||
+        t.lexema == "char"   ||
+        t.lexema == "bool")
+        return declaracionOFuncion(tokens);
  
     // sentencia de expresion / return / etc.  → consumir hasta ';'
     while (indice < (int)tokens.size() &&
@@ -537,25 +635,47 @@ int main(int argc, char* argv[]) {
     html << "table { width:100%; border-collapse:collapse; margin-top:20px; }";
     html << "th, td { border:1px solid gray; padding:8px; }";
     html << "th { background-color:#444; }";
-    html << ".keyword { color:#569CD6; font-weight:bold; }";
-    /*html << ".numero  { color:#4EC9B0; }";
-    html << ".string  { color:#CE9178; }";
-    html << ".ident   { color:#DCDCAA; }";
-    html << ".op      { color:#FFD700; }";
-    html << ".delim   { color:#C586C0; }";
-    html << ".comment { color:#9E9E9E; font-style:italic; }";
-    html << ".error   { color:#FF00FF; font-weight:bold; text-decoration:underline; }";*/
-    html << ".keyword { color:#569CD6; font-weight:bold; }";      // Azul
-    html << ".numero  { color:#4EC9B0; }";                        // Celeste
-    html << ".string  { color:#FFD700; font-style:italic; }";     // Dorado
-    html << ".ident   { color:#FFFF00; }";                        // Amarillo
-    html << ".op      { color:#4CAF50; }";                        // Verde
-    html << ".delim   { color:#D4D4D4; }";                        // Gris claro
-    html << ".comment { color:#808080; font-style:italic; }";     // Gris oscuro
+    html << ".keyword { color:#FF0000; font-weight:bold; }";      // Rojo
+    html << ".numero  { color:#00FFFF; }";                        // Cian
+    html << ".string  { color:#00FF00; font-style:italic; }";     // Verde
+    html << ".ident   { color:#FFFFFF; }";                        // Blanco
+    html << ".op      { color:#FFFF00; }";                        // Amarillo
+    html << ".delim   { color:#C0C0C0; }";                        // Gris plata
+    html << ".comment { color:#808080; font-style:italic; }";     // Gris
     html << ".error   { color:#FF00FF; font-weight:bold; text-decoration:underline; }"; // Magenta
+    html << ".preproc { color:#0000FF; font-style:italic; }";     // Azul
     html << ".syntax-ok { background:#003b46; padding:10px; border-left:5px solid cyan; margin-bottom:10px; border-radius:5px; }";
     html << ".syntax-error { background:#3b003b; padding:10px; border-left:5px solid magenta; margin-bottom:10px; border-radius:5px; }";
- 
+    html << ".syntax-summary { padding:10px 15px; margin-bottom:15px; border-radius:5px; font-weight:bold; }";
+    html << ".syntax-summary.ok { background:#003b1a; border-left:5px solid #00e676; }";
+    html << ".syntax-summary.error { background:#3b003b; border-left:5px solid #8404a0; }";
+    html << ".num-linea { color:#666; display:inline-block; width:30px; text-align:right; margin-right:8px; user-select:none; }";
+    html << ".panel-completo { width:100%; }";
+    // Paleta deuteranomalia (dificultad rojo-verde, la forma mas comun
+    // y habitualmente mas leve de daltonismo), basada en la paleta
+    // Okabe-Ito, validada para uso accesible.
+    html << "body.deuteranomalia .keyword  { color:#0072B2; }";  // azul
+    html << "body.deuteranomalia .numero   { color:#56B4E9; }";  // celeste
+    html << "body.deuteranomalia .string   { color:#E69F00; }";  // naranja
+    html << "body.deuteranomalia .ident    { color:#F0E442; }";  // amarillo
+    html << "body.deuteranomalia .op       { color:#CC79A7; }";  // purpura rosado
+    html << "body.deuteranomalia .delim    { color:#E5E5E5; }";  // gris claro
+    html << "body.deuteranomalia .comment  { color:#9E9E9E; }";  // gris medio
+    html << "body.deuteranomalia .preproc  { color:#009E73; }";  // verde azulado
+    html << "body.deuteranomalia .error    { color:#FF3EA5; }";  // rosa magenta
+    // Paleta tritanopia (dificultad azul-amarillo): se evita el eje
+    // azul/amarillo por completo y se trabaja sobre rojos, verdes y
+    // violetas, que siguen siendo distinguibles para este tipo de
+    // daltonismo.
+    html << "body.tritanopia .keyword  { color:#EF476F; }";  // rojo rosado
+    html << "body.tritanopia .numero   { color:#06D6A0; }";  // verde azulado
+    html << "body.tritanopia .string   { color:#F3722C; }";  // naranja calido
+    html << "body.tritanopia .ident    { color:#FFFFFF; }";  // blanco (se evita el amarillo puro)
+    html << "body.tritanopia .op       { color:#9D4EDD; }";  // violeta
+    html << "body.tritanopia .delim    { color:#B0BEC5; }";  // gris azulado claro
+    html << "body.tritanopia .comment  { color:#9E9E9E; }";  // gris medio
+    html << "body.tritanopia .preproc  { color:#43AA8B; }";  // verde teal
+    html << "body.tritanopia .error    { color:#FF006E; }";  // magenta
     // ── NAVEGACION POR PESTAÑAS ──
     html << "h1 { margin-bottom:10px; }";
     html << ".tabs { display:flex; gap:8px; border-bottom:2px solid #444; margin-bottom:20px; flex-wrap:wrap; }";
@@ -596,40 +716,43 @@ int main(int argc, char* argv[]) {
     html << "<p><span class='op'>OP</span>           &rarr; Operadores</p>";
     html << "<p><span class='delim'>DELIM</span>     &rarr; Delimitadores</p>";
     html << "<p><span class='comment'>COMMENT</span> &rarr; Comentarios</p>";
+    html << "<p><span class='preproc'>PREPROC</span> &rarr; Directivas de preprocesador (#include, #define, etc.)</p>";
     html << "<p><span class='error'>ERROR</span>     &rarr; Error lexico</p>";
  
-    /*// JUSTIFICACION
-    html << "<h2>Justificacion de Colores</h2>";
+    html << "<h2>Justificacion de Colores (paleta Normal)</h2>";
     html << "<ul>";
-    html << "<li><b style='color:#569CD6'>Azul:</b>    keywords importantes.</li>";
-    html << "<li><b style='color:#4EC9B0'>Celeste:</b> numeros faciles de distinguir.</li>";
-    html << "<li><b style='color:#CE9178'>Naranja:</b> strings resaltan texto.</li>";
-    html << "<li><b style='color:#DCDCAA'>Amarillo:</b> identificadores visibles.</li>";
-    html << "<li><b style='color:#FFD700'>Dorado:</b>  operadores importantes.</li>";
-    html << "<li><b style='color:#C586C0'>Morado:</b>  delimitadores estructurales.</li>";
-    html << "<li><b style='color:#6A9955'>Verde:</b>   comentarios auxiliares.</li>";
-    html << "<li><b style='color:#FF5555'>Rojo:</b>    errores visibles inmediatamente.</li>";
-    */
- 
-    html << "<h2>Justificacion de Colores</h2>";
-    html << "<ul>";
-    html << "<li><b style='color:#569CD6'>Azul:</b> palabras reservadas. "
-            "Se eligio por su alta diferenciacion visual y porque permite identificar rapidamente las estructuras principales del lenguaje.</li>";
-    html << "<li><b style='color:#4EC9B0'>Celeste:</b> numeros enteros y flotantes. "
+    html << "<li><b style='color:#FF0000'>Rojo:</b> palabras reservadas. "
+            "Color basico de alto contraste que permite identificar rapidamente las estructuras principales del lenguaje.</li>";
+    html << "<li><b style='color:#00FFFF'>Cian:</b> numeros enteros y flotantes. "
             "Facilita distinguir los valores numericos de otros elementos del codigo fuente.</li>";
-    html << "<li><b style='color:#FFD700'>Dorado:</b> cadenas de texto. "
+    html << "<li><b style='color:#00FF00'>Verde:</b> cadenas de texto. "
             "Presenta un contraste perceptible respecto a las palabras reservadas e identificadores, favoreciendo su reconocimiento.</li>";
-    html << "<li><b style='color:#FFFF00'>Amarillo:</b> identificadores. "
+    html << "<li><b style='color:#FFFFFF'>Blanco:</b> identificadores. "
             "Mantiene buena visibilidad y facilita el seguimiento de variables y funciones durante la lectura del programa.</li>";
-    html << "<li><b style='color:#4CAF50'>Verde:</b> operadores. "
+    html << "<li><b style='color:#FFFF00'>Amarillo:</b> operadores. "
             "Permite una lectura clara de las expresiones sin generar sobrecarga visual.</li>";
-    html << "<li><b style='color:#D4D4D4'>Gris claro:</b> delimitadores. "
+    html << "<li><b style='color:#C0C0C0'>Gris plata:</b> delimitadores. "
             "Al ser elementos estructurales de alta frecuencia, se representan con un color neutro para evitar distracciones visuales.</li>";
-    html << "<li><b style='color:#808080'>Gris oscuro:</b> comentarios. "
+    html << "<li><b style='color:#808080'>Gris:</b> comentarios. "
             "Al corresponder a informacion auxiliar, se muestran con menor prominencia visual para reducir la carga cognitiva.</li>";
     html << "<li><b style='color:#FF00FF'>Magenta:</b> errores lexicos. "
-            "Se eligio por su alta visibilidad para usuarios con deuteranopia y se complementa con estilos adicionales para no depender exclusivamente del color.</li>";
+            "Se eligio por su alta visibilidad y se complementa con negrita y subrayado para no depender exclusivamente del color.</li>";
     html << "</ul>";
+ 
+    html << "<h2>Paletas alternativas</h2>";
+    html << "<p>El selector <b>Paleta de color</b> (en la pestaña Codigo) permite cambiar toda la vista "
+            "a un esquema alternativo pensado para dos tipos de daltonismo:</p>";
+    html << "<ul>";
+    html << "<li><b>Deuteranomalia:</b> dificultad para distinguir rojos y verdes, la forma de daltonismo "
+            "mas comun. Se reemplazan esos tonos por azules, naranjas y amarillos, basados en la paleta "
+            "Okabe-Ito, disenada especificamente para ser distinguible en este tipo de vision.</li>";
+    html << "<li><b>Tritanopia:</b> dificultad para distinguir azules y amarillos. En este caso se evita "
+            "por completo ese eje de color y se trabaja con rojos, verdes, naranjas y violetas, que siguen "
+            "siendo distinguibles entre si.</li>";
+    html << "</ul>";
+    html << "<p>Ademas del color, los errores lexicos siempre se muestran en <b>negrita y subrayados</b> "
+            "y las cadenas de texto/comentarios en <i>cursiva</i>, para que el significado no dependa "
+            "unicamente del color en ninguna paleta.</p>";
  
     html << "</div>"; // fin tab-content accesibilidad
  
@@ -646,7 +769,7 @@ int main(int argc, char* argv[]) {
  
     vector<Token> tokens;
  
-    string linea;
+    string lineaLectura;
     int    numeroLinea        = 1;
     bool   enComentarioBloque = false;
  
@@ -654,31 +777,15 @@ int main(int argc, char* argv[]) {
     // PESTAÑA: CODIGO
     // ==========================
  
-    html << "<div class='tab-content active' id='codigo' role='tabpanel' aria-labelledby='btn-codigo'>";
+html << "<div class='tab-content active' id='codigo' role='tabpanel' aria-labelledby='btn-codigo'>";
  
-    // ── PANEL IZQUIERDO ──
     html << "<div class='contenedor'>";
-    html << "<div class='panel'>";
-    html << "<h2>Codigo Original</h2>";
-    html << "<pre style='tab-size:4;'>";
  
     vector<string> todasLineas;
-    while (getline(archivo, linea)) {
-        todasLineas.push_back(linea);
+    while (getline(archivo, lineaLectura)) {
+        todasLineas.push_back(lineaLectura);
     }
     archivo.close();
- 
-    for (const string& l : todasLineas) {
-        for (char ch : l) {
-            if      (ch == ' ')  html << "&nbsp;";
-            else if (ch == '\t') html << "&nbsp;&nbsp;&nbsp;&nbsp;";
-            else                 html << ch;
-        }
-        html << "<br>";
-    }
- 
-    html << "</pre>";
-    html << "</div>";
  
     // ==========================
     // ANALISIS LEXICO
@@ -689,6 +796,21 @@ int main(int argc, char* argv[]) {
     for (const string& linea : todasLineas) {
  
         string actual = "";
+ 
+        // ── DIRECTIVA DE PREPROCESADOR (#include, #define, etc.) ──
+        {
+            size_t primerNoEspacio = linea.find_first_not_of(" \t");
+            if (primerNoEspacio != string::npos && linea[primerNoEspacio] == '#') {
+                Token nuevo;
+                nuevo.lexema  = linea;
+                nuevo.tipo    = "PREPROC";
+                nuevo.linea   = numeroLinea;
+                nuevo.columna = (int)primerNoEspacio + 1;
+                tokens.push_back(nuevo);
+                numeroLinea++;
+                continue; // pasar directamente a la siguiente linea
+            }
+        }
  
         for (int i = 0; i < (int)linea.length(); i++) {
  
@@ -789,6 +911,33 @@ int main(int argc, char* argv[]) {
                 continue;
             }
  
+            // ── CARACTERES ' ' ──
+            if (c == '\'') {
+                if (actual != "") {
+                    Token nuevo;
+                    nuevo.lexema  = actual;
+                    nuevo.tipo    = obtenerTipo(actual);
+                    nuevo.linea   = numeroLinea;
+                    nuevo.columna = i - (int)actual.length() + 1;
+                    tokens.push_back(nuevo);
+                    actual = "";
+                }
+                string caracter = "'";
+                i++;
+                while (i < (int)linea.length() && linea[i] != '\'') {
+                    caracter += linea[i];
+                    i++;
+                }
+                if (i < (int)linea.length()) caracter += "'";
+                Token nuevo2;
+                nuevo2.lexema  = caracter;
+                nuevo2.tipo    = "STRING";
+                nuevo2.linea   = numeroLinea;
+                nuevo2.columna = i - (int)caracter.length() + 2;
+                tokens.push_back(nuevo2);
+                continue;
+            }
+ 
             // ── OPERADORES Y DELIMITADORES ──
             if (
                 c=='+' || c=='-' || c=='*' || c=='/' ||
@@ -809,7 +958,8 @@ int main(int argc, char* argv[]) {
                     if (
                         doble == "==" || doble == "!=" ||
                         doble == "<=" || doble == ">=" ||
-                        doble == "++" || doble == "--"
+                        doble == "++" || doble == "--" ||
+                        doble == "<<" || doble == ">>"
                     ) {
                         Token nuevo;
                         nuevo.lexema  = doble;
@@ -849,11 +999,20 @@ int main(int argc, char* argv[]) {
  
     // ── PANEL DERECHO: CODIGO RESALTADO ──
  
-    html << "<div class='panel'>";
+    html << "<div class='panel panel-completo'>";
     html << "<h2>Codigo Resaltado</h2>";
+    html << "<div style='margin-bottom:10px;'>";
+    html << "<label for='paleta'>Paleta de color: </label>";
+    html << "<select id='paleta' onchange=\"document.body.className = this.value\">";
+    html << "<option value=''>Normal</option>";
+    html << "<option value='deuteranomalia'>Deuteranopía</option>";
+    html << "<option value='tritanopia'>Tritanopia</option>";
+    html << "</select>";
+    html << "</div>";
     html << "<pre style='tab-size:4;'>";
  
     int lineaActual = 1;
+    html << "<span class='num-linea'>" << lineaActual << "</span> ";
  
     for (int i = 0; i < (int)tokens.size(); i++) {
  
@@ -863,6 +1022,7 @@ int main(int argc, char* argv[]) {
             cout << "\n";
             html << "<br>";
             lineaActual++;
+            html << "<span class='num-linea'>" << lineaActual << "</span> ";
         }
  
         string mostrar = t.lexema;
@@ -883,6 +1043,7 @@ int main(int argc, char* argv[]) {
         else if (t.tipo == "OP")       { clase = "op";      color = COLOR_OP;      }
         else if (t.tipo == "DELIM")    { clase = "delim";   color = COLOR_DELIM;   }
         else if (t.tipo == "COMMENT")  { clase = "comment"; color = COLOR_COMMENT; }
+        else if (t.tipo == "PREPROC")  { clase = "preproc"; color = COLOR_MAGENTA_OSCURO; }
  
         setColor(color);
         cout << t.lexema << " ";
@@ -908,7 +1069,7 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < (int)tokens.size(); i++) {
         Token t = tokens[i];
         html << "<tr>";
-        html << "<td>" << t.lexema  << "</td>";
+        html << "<td>" << escaparHtml(t.lexema) << "</td>";
         html << "<td>" << t.tipo    << "</td>";
         html << "<td>" << t.linea   << "</td>";
         html << "<td>" << t.columna << "</td>";
@@ -930,11 +1091,28 @@ int main(int argc, char* argv[]) {
     html << "<h2>Analisis Sintactico</h2>";
  
     indice = 0;
+    ostringstream bufferSintactico;
+ 
+    // Cuenta cuantas funciones (nivel superior) siguen abiertas.
+    // Se usa para reconocer la '}' que cierra una funcion y no
+    // mostrarla como "token no reconocido", sin volver a tragarse
+    // todo el cuerpo de la funcion como un unico bloque (asi cada
+    // sentencia interna se sigue mostrando por separado, como antes).
+    int profundidadFuncion = 0;
  
     while (indice < (int)tokens.size()) {
  
         saltarComentarios(tokens);
         if (indice >= (int)tokens.size()) break;
+ 
+        // Si estamos dentro de una funcion y llegamos a la '}' que
+        // la cierra, simplemente la consumimos y seguimos con el
+        // resto del archivo (no genera tarjeta propia).
+        if (profundidadFuncion > 0 && actualToken(tokens).lexema == "}") {
+            avanzar();
+            profundidadFuncion--;
+            continue;
+        }
  
         int    inicio = indice;
         Token  t      = actualToken(tokens);
@@ -942,13 +1120,33 @@ int main(int argc, char* argv[]) {
         // Reglas reconocidas en nivel superior
         bool ok = false;
  
-        if (t.lexema == "if")    { ok = sentenciaIf(tokens);    }
+        if (esInicioFuncion(tokens)) {
+            // Solo se valida y muestra la firma (TIPO/void IDENT ( ) {).
+            // El cuerpo se sigue analizando sentencia por sentencia
+            // en las siguientes vueltas del while, igual que antes.
+            ok = encabezadoFuncion(tokens);
+            if (ok) profundidadFuncion++;
+        }
+        else if (t.lexema == "if")    { ok = sentenciaIf(tokens);    }
         else if (t.lexema == "while") { ok = sentenciaWhile(tokens); }
         else if (t.lexema == "for")   { ok = sentenciaFor(tokens);   }
         else if (t.lexema == "void")  { ok = sentenciaVoid(tokens);  }
         else if (t.lexema == "int"   ||
                  t.lexema == "float" ||
-                 t.lexema == "string") { ok = declaracion(tokens); }
+                 t.lexema == "string"||
+                 t.lexema == "char"  ||
+                 t.lexema == "bool")  { ok = declaracion(tokens); }
+        else if (t.lexema == "return" || t.tipo == "IDENT") {
+            // return, llamada a funcion (cout, cin, etc.) u otra sentencia de expresion:
+            // se consume hasta el ';' de cierre.
+            while (indice < (int)tokens.size() &&
+                   actualToken(tokens).lexema != ";" &&
+                   actualToken(tokens).lexema != "}" &&
+                   actualToken(tokens).tipo   != "EOF")
+                avanzar();
+            if (actualToken(tokens).lexema == ";") avanzar();
+            ok = true;
+        }
         else {
             // token no reconocido en nivel superior: recuperacion
             string err = "Token no reconocido en nivel superior: <b>" + t.lexema + "</b> (linea " + to_string(t.linea) + ")";
@@ -956,6 +1154,15 @@ int main(int argc, char* argv[]) {
             setColor(COLOR_ERROR);
             cout << "ERROR: token no reconocido: " << t.lexema << " (linea " << t.linea << ")\n";
             setColor(7);
+
+            // Se muestra tambien su propia tarjeta de error, para que
+            // el numero de tarjetas coincida siempre con el contador
+            // de "error(es) encontrado(s)" del resumen.
+            bufferSintactico << "<div class='syntax-error'>";
+            bufferSintactico << "&#10006; <b>Error Sintactico</b><br><br>";
+            bufferSintactico << err << "<br>";
+            bufferSintactico << "</div>";
+
             avanzar();
             continue;
         }
@@ -971,23 +1178,30 @@ int main(int argc, char* argv[]) {
             cout << "Construccion correcta: " << texto << endl;
             setColor(7);
  
-            html << "<div class='syntax-ok'>";
-            html << "&#10004; <b>Construccion correcta</b><br><br>";
-            html << "<code>" << texto << "</code>";
-            html << "</div>";
+            bufferSintactico << "<div class='syntax-ok'>";
+            bufferSintactico << "&#10004; <b>Construccion correcta</b><br><br>";
+            bufferSintactico << "<code>" << texto << "</code>";
+            bufferSintactico << "</div>";
         } else {
             // MAGENTA
             setColor(13);
             cout << "Error Sintactico: " << texto << endl;
             setColor(7);
-            html << "<div class='syntax-error'>";
-            html << "&#10006; <b>Error Sintactico</b><br><br>";
+            bufferSintactico << "<div class='syntax-error'>";
+            bufferSintactico << "&#10006; <b>Error Sintactico</b><br><br>";
             if (!erroresSintacticos.empty()) {
-                html << erroresSintacticos.back() << "<br>";
+                bufferSintactico << erroresSintacticos.back() << "<br>";
             }
-            html << "</div>";
+            bufferSintactico << "</div>";
         }
     }
+ 
+    if (erroresSintacticos.empty()) {
+        html << "<div class='syntax-summary ok'>&#9989; 0 errores encontrados</div>";
+    } else {
+        html << "<div class='syntax-summary error'>&#10060; " << erroresSintacticos.size() << " error(es) encontrado(s)</div>";
+    }
+    html << bufferSintactico.str();
  
     html << "</div>"; // fin tab-content sintactico
  
